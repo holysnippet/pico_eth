@@ -105,7 +105,7 @@ waite0:
         sm_config_set_in_shift(&sm_config, true, true, 8);
         sm_config_set_fifo_join(&sm_config, PIO_FIFO_JOIN_RX);
 
-        sm_config_set_clkdiv(&sm_config, 1.0f);
+        sm_config_set_clkdiv(&sm_config, clock_get_hz(clk_sys) / (120000000.0f));
 
         pio_gpio_init(pio, data_pin);
 
@@ -124,7 +124,7 @@ waite0:
         sm_config_set_out_shift(&c, true, true, 8);
         sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
 
-        sm_config_set_clkdiv(&c, 1.0);
+        sm_config_set_clkdiv(&c, clock_get_hz(clk_sys) / (120000000.0f));
 
         pio_gpio_init(pio, pin_tx);
         pio_gpio_init(pio, pin_tx + 1);
@@ -146,7 +146,7 @@ waite0:
         sm_config_set_jmp_pin(&sm_config, data_pin);
         sm_config_set_in_shift(&sm_config, true, false, 32);
 
-        sm_config_set_clkdiv(&sm_config, 1.0f);
+        sm_config_set_clkdiv(&sm_config, clock_get_hz(clk_sys) / (120000000.0f));
 
         pio_gpio_init(pio, data_pin);
 
