@@ -1,3 +1,0 @@
-C:/Users/psyke/Desktop/pico_eth_github/pico_eth/build/pioasm/CMakeFiles/pioasm.dir
-C:/Users/psyke/Desktop/pico_eth_github/pico_eth/build/pioasm/CMakeFiles/edit_cache.dir
-C:/Users/psyke/Desktop/pico_eth_github/pico_eth/build/pioasm/CMakeFiles/rebuild_cache.dir
