@@ -2,7 +2,7 @@
 ; * 802.3 (10BASE-T Ethernet) MAC-like RP2040 PIO Program - ROBIN Guillaume
 ; ! This software is released under the same license, terms and conditions as the RP2040 "Pico" SDK
 ; ~ https://github.com/holysnippet/pico_eth/
-; * Version 8nov2022a - Timings to be tested, no RX NLPs, eth_ser may need rework
+; * Version 0.1.0-beta - https://github.com/holysnippet/pico_eth/
 ;
 .program eth_ser
 stop:
