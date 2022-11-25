@@ -1,0 +1,17 @@
+{
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "files.associations": {
+        "main.h": "c",
+        "pio.h": "c",
+        "functional": "c",
+        "picopioeth.h": "c",
+        "ethpio_arch.h": "c",
+        "string_view": "c",
+        "ntptest.h": "c",
+        "mqtt_opts.h": "c",
+        "httpd.h": "c",
+        "lwiperf.h": "c",
+        "shell.h": "c"
+    },
+    "cortex-debug.variableUseNaturalFormat": true
+}

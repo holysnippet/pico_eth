@@ -1,0 +1,162 @@
+;
+; * 802.3 (10BASE-T Ethernet) MAC-like RP2040 PIO Program - ROBIN Guillaume
+; ! This software is released under the same license, terms and conditions as the RP2040 "Pico" SDK
+; ~ https://github.com/holysnippet/pico_eth/
+; * Version 8nov2022a - Timings to be tested, no RX NLPs, eth_ser may need rework
+;
+.program eth_ser
+stop:
+    set pins, 0b10  [23]
+nlp:
+    set pins, 0b10  [11]
+.wrap_target
+init:
+    set pins, 0b00
+.wrap
+send_0:
+    set pins, 0b10  [5]
+    set pins, 0b01  [2]    
+next:               ;(5)
+    jmp !osre nextt
+    jmp stop
+nextt:
+    out X, 1
+    jmp !X send_0
+send_1:
+    set pins, 0b01  [5]
+    set pins, 0b10  [1]
+    jmp next
+
+.program eth_det
+reset:
+    irq set 4
+    irq wait 0
+waitd0:
+    wait 0 pin 0
+.wrap_target    
+    in pins, 1      [4]
+    mov X, ISR
+    jmp X!=Y continue
+decl:
+    nop             [3]
+    irq clear 4
+waits:
+    set X, 9        ;(7)
+chk:
+    jmp pin, incc
+    jmp waits
+incc:
+    jmp X--, chk
+    jmp reset
+continue:
+    jmp pin waitd0
+    wait 1 pin 0
+.wrap 
+
+.program eth_des
+waite0:
+    wait 0 pin 0
+.wrap_target    
+    wait 0 irq 4
+    in pins, 1      [6]
+    jmp pin waite0
+    wait 1 pin 0
+.wrap   
+
+% c-sdk {
+    #include "hardware/clocks.h"
+
+    static void pio_set_y(PIO pio, uint sm, uint32_t v)
+    {
+        const uint instr_shift = pio_encode_in(pio_y, 4);
+        const uint instr_mov = pio_encode_mov(pio_y, pio_isr);
+
+        for (int i = 7; i >= 0; i--)
+        {
+            const uint32_t nibble = (v >> (i * 4)) & 0xf;
+            pio_sm_exec(pio, sm, pio_encode_set(pio_y, nibble));
+            pio_sm_exec(pio, sm, instr_shift);
+        }
+        pio_sm_exec(pio, sm, instr_mov);
+    }
+
+    static void pio_set_x(PIO pio, uint sm, uint32_t v)
+    {
+        const uint instr_shift = pio_encode_in(pio_x, 4);
+        const uint instr_mov = pio_encode_mov(pio_x, pio_isr);
+
+        for (int i = 7; i >= 0; i--)
+        {
+            const uint32_t nibble = (v >> (i * 4)) & 0xf;
+            pio_sm_exec(pio, sm, pio_encode_set(pio_x, nibble));
+            pio_sm_exec(pio, sm, instr_shift);
+        }
+        pio_sm_exec(pio, sm, instr_mov);
+    }
+
+    static inline void eth_des_program_init(PIO pio, uint sm, uint offset, uint data_pin)
+    {
+        pio_sm_config sm_config = eth_des_program_get_default_config(offset);
+
+        pio_sm_set_pindirs_with_mask(pio, sm, 0u, 1u << data_pin);
+
+        sm_config_set_in_pins(&sm_config, data_pin);
+        sm_config_set_jmp_pin(&sm_config, data_pin);
+        sm_config_set_in_shift(&sm_config, true, true, 8);
+        sm_config_set_fifo_join(&sm_config, PIO_FIFO_JOIN_RX);
+
+        sm_config_set_clkdiv(&sm_config, 1.0f);
+
+        pio_gpio_init(pio, data_pin);
+
+        pio_sm_init(pio, sm, offset + 0x01, &sm_config);
+        pio_sm_exec(pio, sm, pio_encode_irq_set(false, 4));
+    }
+
+    static inline void eth_ser_program_init(PIO pio, uint sm, uint offset, uint pin_tx)
+    {
+        pio_sm_config c = eth_ser_program_get_default_config(offset);
+
+        pio_sm_set_pins_with_mask(pio, sm, 0u, 3u << pin_tx);
+        pio_sm_set_pindirs_with_mask(pio, sm, ~0u, 3u << pin_tx);
+        
+        sm_config_set_set_pins(&c, pin_tx, 2);
+        sm_config_set_out_shift(&c, true, true, 8);
+        sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
+
+        sm_config_set_clkdiv(&c, 1.0);
+
+        pio_gpio_init(pio, pin_tx);
+        pio_gpio_init(pio, pin_tx + 1);
+
+        // gpio_set_drive_strength(pin_tx, GPIO_DRIVE_STRENGTH_12MA);
+        // gpio_set_slew_rate(pin_tx, GPIO_SLEW_RATE_FAST);
+        // gpio_set_drive_strength(pin_tx + 1, GPIO_DRIVE_STRENGTH_12MA);
+        // gpio_set_slew_rate(pin_tx + 1, GPIO_SLEW_RATE_FAST);
+
+        pio_sm_init(pio, sm, offset + 0x02, &c);
+    }
+
+    static inline void eth_det_program_init(PIO pio, uint sm, uint offset, uint data_pin) {
+        pio_sm_config sm_config = eth_det_program_get_default_config(offset);
+
+        pio_sm_set_pindirs_with_mask(pio, sm, 0u, 1u << data_pin);
+
+        sm_config_set_in_pins(&sm_config, data_pin);
+        sm_config_set_jmp_pin(&sm_config, data_pin);
+        sm_config_set_in_shift(&sm_config, true, false, 32);
+
+        sm_config_set_clkdiv(&sm_config, 1.0f);
+
+        pio_gpio_init(pio, data_pin);
+
+        pio_sm_init(pio, sm, offset + 0x02, &sm_config);
+        pio_set_y(pio, sm, 0x5555555D);
+    }
+
+    static void pio_jump_nlp(PIO pio, uint sm, uint offset)
+    {
+        const uint instr_eth_nlp = pio_encode_jmp(offset + 0x01);
+        pio_sm_exec(pio, sm, instr_eth_nlp);
+    }
+%}
