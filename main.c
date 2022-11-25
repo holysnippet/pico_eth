@@ -10,7 +10,7 @@
         - lwIP iPerf 2 (TCP only, no UDP) stack test server (beware, this lwIP app only supports v2)
         - lwIP NTP Client demo (prints the grabbed time on the USB serial port)
 
-        - USB Serial port emulation is enabled (End of CMakeLists.txt)
+        -> USB Serial port emulation is enabled (End of CMakeLists.txt)
 */
 
 #include <stdint.h>

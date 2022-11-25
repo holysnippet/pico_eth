@@ -8684,8 +8684,7 @@ CMakeFiles/pico_eth.dir/main.c.obj: ../main.c \
   ../ntptest.h \
   C:/VSARM/armgcc/arm-none-eabi/include/time.h \
   C:/VSARM/armgcc/arm-none-eabi/include/machine/time.h \
-  ../lwiperftest.h \
-  ../mqtttest.h
+  ../lwiperftest.h
 
 CMakeFiles/pico_eth.dir/ntptest.c.obj: ../ntptest.c \
   ../ntptest.h \
@@ -9182,8 +9181,6 @@ C:/VSARM/sdk/pico/pico-sdk/lib/lwip/src/include/lwip/dhcp.h:
 C:/VSARM/sdk/pico/pico-sdk/src/rp2040/hardware_regs/include/hardware/regs/sio.h:
 
 C:/VSARM/sdk/pico/pico-sdk/lib/lwip/src/include/lwip/autoip.h:
-
-../mqtttest.h:
 
 C:/VSARM/sdk/pico/pico-sdk/lib/lwip/src/include/lwip/prot/dhcp.h:
 
