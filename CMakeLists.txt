@@ -26,7 +26,7 @@ target_sources(${PROJECT_NAME} PRIVATE
 )
 
 # Link to pico_stdlib (gpio, time, etc. functions)
-target_link_libraries(${PROJECT_NAME} PRIVATE
+target_link_libraries(${PROJECT_NAME}
     hardware_dma
     hardware_irq
     hardware_pio
