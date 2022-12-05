@@ -311,6 +311,8 @@ bool eth_set_params(PIO pio, uint8_t tx_neg_pin, uint8_t rx_pin)
         return false;
 
     gpio_disable_pulls(rx_pin);
+    gpio_set_dir(tx_neg_pin, true);
+    gpio_set_dir(tx_neg_pin + 1, true);
 
     eth_pio = pio;
     eth_tx_neg_pin = tx_neg_pin;
