@@ -1,7 +1,7 @@
 /*
     RP2040 Ethernet/PIO lwIP Driver
     This software is released under the same license, terms and conditions as the RP2040 "Pico" SDK
-    0.1.0-beta - https://github.com/holysnippet/pico_eth/
+    0.1.2-beta - https://github.com/holysnippet/pico_eth/
 */
 
 #include "ethpio_arch.h"

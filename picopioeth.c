@@ -1,7 +1,7 @@
 /*
     RP2040 Ethernet/PIO Firmware
     This software is released under the same license, terms and conditions as the RP2040 "Pico" SDK
-    0.1.0-beta - https://github.com/holysnippet/pico_eth/
+    0.1.2-beta - https://github.com/holysnippet/pico_eth/
 */
 
 #include "picopioeth.h"
@@ -13,8 +13,6 @@ const uint8_t ser_sm = 0u, des_sm = 1u, det_sm = 2u;
 uint8_t ser_offset, ser_basepin;
 uint8_t des_offset, des_basepin;
 uint8_t det_offset, det_irq;
-
-uint32_t des_pp_jmp;
 
 int32_t ser_dma_chan, des_dma_chan, copy_dma_chan;
 dma_channel_config ser_dma_cfg, des_dma_cfg, copy_dma_cfg;
@@ -113,8 +111,6 @@ void des_setup(void)
     pio_sm_claim(eth_pio, des_sm);
 
     des_offset = pio_add_program(eth_pio, &eth_des_program);
-    des_pp_jmp = pio_encode_jmp(des_offset + 1u);
-
     eth_des_program_init(eth_pio, des_sm, des_offset, eth_rx_pos_pin);
 
     des_dma_cfg = dma_channel_get_default_config(des_dma_chan);
@@ -123,9 +119,6 @@ void des_setup(void)
     channel_config_set_write_increment(&des_dma_cfg, true);
     channel_config_set_dreq(&des_dma_cfg, pio_get_dreq(eth_pio, des_sm, false));
     channel_config_set_ring(&des_dma_cfg, true, RX_RING_BITS);
-    //
-    channel_config_set_chain_to(&des_dma_cfg, des_dma_chan);
-    //
     channel_config_set_irq_quiet(&des_dma_cfg, true);
 
     dma_channel_configure(des_dma_chan, &des_dma_cfg, des_rx_buf, &((uint8_t *)(&eth_pio->rxf[des_sm]))[3], UINT32_MAX, false);
@@ -151,20 +144,14 @@ void _det_irq(void)
     while (eth_pio->fstat & (1u << (PIO_FSTAT_RXEMPTY_LSB + des_sm)) == 0)
         tight_loop_contents();
 
-    dma_hw->abort = 1u << des_dma_chan;
-
-    eth_pio->ctrl = eth_pio->ctrl & ~(1u << des_sm);
     eth_pio->ctrl |= 1u << (PIO_CTRL_SM_RESTART_LSB + des_sm);
-    eth_pio->sm[des_sm].instr = des_pp_jmp;
 
-    while (dma_hw->ch[des_dma_chan].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS)
-        tight_loop_contents();
+    dma_hw->abort = 1u << des_dma_chan;
 
     const uint32_t wr_ptr = dma_hw->ch[des_dma_chan].write_addr - (uint32_t)(des_rx_buf);
 
     dma_hw->ch[des_dma_chan].al1_transfer_count_trig = UINT32_MAX;
 
-    eth_pio->ctrl = eth_pio->ctrl | (1u << des_sm);
     hw_set_bits(&eth_pio->irq, 1u);
 
     const uint32_t rx_size = wr_ptr >= last_wr_ptr ? wr_ptr - last_wr_ptr : (RX_RING_SIZE - last_wr_ptr) + wr_ptr;
