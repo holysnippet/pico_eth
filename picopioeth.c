@@ -16,15 +16,15 @@ uint8_t det_offset, det_irq;
 
 uint32_t des_pp_jmp;
 
-int32_t ser_dma_chan, des_dma_chan0, des_dma_chan1, copy_dma_chan, des_dma_cur_chan;
-dma_channel_config ser_dma_cfg, des_dma_cfg0, des_dma_cfg1, copy_dma_cfg;
+int32_t ser_dma_chan, des_dma_chan, copy_dma_chan;
+dma_channel_config ser_dma_cfg, des_dma_cfg, copy_dma_cfg;
 
 static uint8_t ser_buffer[TX_BUFFER_SIZE] __attribute__((aligned(4)));
 const uint8_t *eth_tx_netif_base = &ser_buffer[8];
 
 absolute_time_t last_tx;
 
-uint8_t des_rx_buf[RX_RING_SIZE] __attribute__((aligned(4)));
+uint8_t des_rx_buf[RX_RING_SIZE] __attribute__((aligned(2 * RX_RING_SIZE)));
 uint16_t sizes_tab[RX_NCHUNKS_MAX] __attribute__((aligned(4))), bases_tab[RX_NCHUNKS_MAX] __attribute__((aligned(4)));
 uint16_t fifo_read __attribute__((aligned(4))), fifo_start __attribute__((aligned(4))), fifo_stop __attribute__((aligned(4)));
 uint32_t ring_len, last_wr_ptr;
@@ -117,24 +117,19 @@ void des_setup(void)
 
     eth_des_program_init(eth_pio, des_sm, des_offset, eth_rx_pos_pin);
 
-    des_dma_cfg0 = dma_channel_get_default_config(des_dma_chan0);
-    channel_config_set_transfer_data_size(&des_dma_cfg0, DMA_SIZE_8);
-    channel_config_set_chain_to(&des_dma_cfg0, des_dma_chan1);
-    channel_config_set_read_increment(&des_dma_cfg0, false);
-    channel_config_set_write_increment(&des_dma_cfg0, true);
-    channel_config_set_dreq(&des_dma_cfg0, pio_get_dreq(eth_pio, des_sm, false));
+    des_dma_cfg = dma_channel_get_default_config(des_dma_chan);
+    channel_config_set_transfer_data_size(&des_dma_cfg, DMA_SIZE_8);
+    channel_config_set_read_increment(&des_dma_cfg, false);
+    channel_config_set_write_increment(&des_dma_cfg, true);
+    channel_config_set_dreq(&des_dma_cfg, pio_get_dreq(eth_pio, des_sm, false));
+    channel_config_set_ring(&des_dma_cfg, true, RX_RING_BITS);
+    //
+    channel_config_set_chain_to(&des_dma_cfg, des_dma_chan);
+    //
+    channel_config_set_irq_quiet(&des_dma_cfg, true);
 
-    des_dma_cfg1 = dma_channel_get_default_config(des_dma_chan1);
-    channel_config_set_transfer_data_size(&des_dma_cfg1, DMA_SIZE_8);
-    channel_config_set_chain_to(&des_dma_cfg1, des_dma_chan0);
-    channel_config_set_read_increment(&des_dma_cfg1, false);
-    channel_config_set_write_increment(&des_dma_cfg1, true);
-    channel_config_set_dreq(&des_dma_cfg1, pio_get_dreq(eth_pio, des_sm, false));
+    dma_channel_configure(des_dma_chan, &des_dma_cfg, des_rx_buf, &((uint8_t *)(&eth_pio->rxf[des_sm]))[3], UINT32_MAX, false);
 
-    dma_channel_configure(des_dma_chan0, &des_dma_cfg0, des_rx_buf, &((uint8_t *)(&eth_pio->rxf[des_sm]))[3], RX_RING_SIZE, false);
-    dma_channel_configure(des_dma_chan1, &des_dma_cfg1, des_rx_buf, &((uint8_t *)(&eth_pio->rxf[des_sm]))[3], RX_RING_SIZE, false);
-
-    des_dma_cur_chan = des_dma_chan0;
     last_wr_ptr = 0u;
 
     for (int i = 0; i < RX_NCHUNKS_MAX; i++)
@@ -153,20 +148,21 @@ void _det_irq(void)
 {
     eth_pio->ctrl |= 1u << (PIO_CTRL_SM_RESTART_LSB + det_sm);
 
-    while (eth_pio->fstat & (1u << (PIO_FSTAT_RXEMPTY_LSB + det_sm)) == 0)
+    while (eth_pio->fstat & (1u << (PIO_FSTAT_RXEMPTY_LSB + des_sm)) == 0)
         tight_loop_contents();
+
+    dma_hw->abort = 1u << des_dma_chan;
 
     eth_pio->ctrl = eth_pio->ctrl & ~(1u << des_sm);
     eth_pio->ctrl |= 1u << (PIO_CTRL_SM_RESTART_LSB + des_sm);
     eth_pio->sm[des_sm].instr = des_pp_jmp;
 
-    if (!dma_hw->ch[des_dma_cur_chan].transfer_count)
-    {
-        dma_channel_set_write_addr(des_dma_cur_chan, des_rx_buf, false);
-        des_dma_cur_chan = des_dma_cur_chan == des_dma_chan0 ? des_dma_chan1 : des_dma_chan0;
-    }
+    while (dma_hw->ch[des_dma_chan].ctrl_trig & DMA_CH0_CTRL_TRIG_BUSY_BITS)
+        tight_loop_contents();
 
-    const uint32_t wr_ptr = RX_RING_SIZE - dma_hw->ch[des_dma_cur_chan].transfer_count;
+    const uint32_t wr_ptr = dma_hw->ch[des_dma_chan].write_addr - (uint32_t)(des_rx_buf);
+
+    dma_hw->ch[des_dma_chan].al1_transfer_count_trig = UINT32_MAX;
 
     eth_pio->ctrl = eth_pio->ctrl | (1u << des_sm);
     hw_set_bits(&eth_pio->irq, 1u);
@@ -326,11 +322,8 @@ bool eth_set_params(PIO pio, uint8_t tx_neg_pin, uint8_t rx_pin)
     ser_dma_chan = dma_claim_unused_channel(false);
     if (ser_dma_chan == -1)
         return false;
-    des_dma_chan0 = dma_claim_unused_channel(false);
-    if (des_dma_chan0 == -1)
-        return false;
-    des_dma_chan1 = dma_claim_unused_channel(false);
-    if (des_dma_chan1 == -1)
+    des_dma_chan = dma_claim_unused_channel(false);
+    if (des_dma_chan == -1)
         return false;
     copy_dma_chan = dma_claim_unused_channel(false);
     if (copy_dma_chan == -1)
@@ -357,7 +350,7 @@ bool eth_hw_init(PIO pio, uint8_t tx_neg_pin, uint8_t rx_pin)
     des_setup();
     det_setup();
 
-    dma_channel_start(des_dma_chan0);
+    dma_channel_start(des_dma_chan);
 
     pio_interrupt_clear(eth_pio, 0);
     irq_clear(det_irq);
