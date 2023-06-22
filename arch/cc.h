@@ -74,6 +74,6 @@ typedef int sys_prot_t;
 unsigned int pico_lwip_rand(void);
 #ifndef LWIP_RAND
 // Use ROSC based random number generation, more for the fact that rand() may not be seeded, than anything else
-#define LWIP_RAND pico_lwip_rand
+#define LWIP_RAND rand
 #endif
 #endif /* __CC_H__ */
