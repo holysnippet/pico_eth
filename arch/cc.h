@@ -32,6 +32,8 @@
 #ifndef __CC_H__
 #define __CC_H__
 
+#include <stdlib.h>
+
 #if NO_SYS
 // todo really we should just not allow SYS_LIGHTWEIGHT_PROT for nosys mode (it doesn't do anything anyway)
 typedef int sys_prot_t;
@@ -71,7 +73,7 @@ typedef int sys_prot_t;
 
 #define LWIP_PLATFORM_ASSERT(x) do { if(!(x)) while(1); } while(0)
 
-unsigned int pico_lwip_rand(void);
+//unsigned int pico_lwip_rand(void);
 #ifndef LWIP_RAND
 // Use ROSC based random number generation, more for the fact that rand() may not be seeded, than anything else
 #define LWIP_RAND rand
