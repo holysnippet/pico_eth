@@ -105,7 +105,10 @@ inline bool eth_rx_get(uint8_t *data)
 void eth_rx_next(void)
 {
     if (fifo_read != fifo_stop)
+    {
         fifo_read = (fifo_read + 1) % RX_NCHUNKS_MAX;
+        fifo_start = fifo_read; // BugFix
+    }
 }
 
 void des_setup(void)
